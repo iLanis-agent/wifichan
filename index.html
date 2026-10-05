@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WifiChan - why your Wi-Fi channel choice is mostly wrong</title>
+<meta name="description" content="WifiChan draws the 2.4 and 5 GHz Wi-Fi channels to scale: which channels actually overlap, why 1/6/11 is the only clean US set, and what an 80 MHz channel swallows.">
+<style>
+  :root { --bg:#0e1116; --card:#171c24; --ink:#e8ecf1; --dim:#9aa6b2; --acc:#a78bfa; --acc2:#38bdf8; --line:#262e3a; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.6 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  .wrap { max-width:760px; margin:0 auto; padding:48px 20px 64px; }
+  h1 { font-size:38px; line-height:1.15; margin:0 0 16px; letter-spacing:-0.5px; }
+  h1 span { color:var(--acc); }
+  p.lede { font-size:19px; color:var(--dim); margin:0 0 28px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:22px 24px; margin:18px 0; }
+  .card h2 { margin:0 0 8px; font-size:20px; }
+  .card p { margin:0; color:var(--dim); }
+  .num { color:var(--acc); font-weight:700; }
+  .cta { display:inline-block; margin-top:28px; background:var(--acc); color:#221243; font-weight:700; font-size:18px; padding:14px 30px; border-radius:12px; text-decoration:none; }
+  .cta:hover { filter:brightness(1.08); }
+  .fine { margin-top:34px; font-size:13px; color:var(--dim); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>The 2.4 GHz band has 11 channels and room for <span>3</span>.</h1>
+  <p class="lede">Each Wi-Fi channel is 22 MHz wide, but the channels are spaced 5 MHz apart - so "channel 3" is not empty space between 1 and 6, it is a jammer for both. WifiChan draws the band to scale and shows exactly which channels talk over yours, plus what a wide 5 GHz channel really swallows.</p>
+
+  <div class="card">
+    <h2>Overlap, measured in MHz</h2>
+    <p>Pick channel 4 and you overlap channel 1 by <span class="num">7 MHz</span> and channel 6 by <span class="num">12 MHz</span> - worse than picking either. WifiChan computes the exact overlap of every channel pair, by region.</p>
+  </div>
+  <div class="card">
+    <h2>The only clean sets, proven</h2>
+    <p>Channels 1/6/11 are not folklore - they are the unique maximum non-overlapping set in the US band, found here by exhaustive search over every combination. In ETSI-land (1-13) there are exactly 10 maximal sets, and WifiChan lists them all.</p>
+  </div>
+  <div class="card">
+    <h2>5 GHz: wide channels are block parties</h2>
+    <p>An 80 MHz channel is not "channel 36, but wider" - it is the fixed 36-48 block, and it shares airtime with every network in all four 20 MHz slots. See which blocks exist, which need DFS radar checks, and why channel 165 is 20 MHz only.</p>
+  </div>
+
+  <a class="cta" href="app.html">See your channel</a>
+  <p class="fine">Runs entirely in your browser. Frequencies and bonding blocks per the IEEE 802.11 channel tables; engine cross-checked against an independent Python reference (195 checks, 0 disagreements).</p>
+</div>
+</body>
+</html>
