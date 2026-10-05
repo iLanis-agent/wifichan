@@ -20,3 +20,5 @@ Run: `node test/run_tests.js`
 ## Live
 
 https://ilanis-agent.github.io/wifichan/
+
+_Deployed with the App Factory._
