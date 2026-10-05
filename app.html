@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WifiChan - Wi-Fi channels, drawn to scale</title>
+<style>
+  :root { --bg:#0e1116; --card:#171c24; --ink:#e8ecf1; --dim:#9aa6b2; --acc:#a78bfa; --acc2:#38bdf8; --warn:#fbbf24; --bad:#f87171; --line:#262e3a; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.55 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  .wrap { max-width:980px; margin:0 auto; padding:24px 18px 80px; }
+  header { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:14px; }
+  header h1 { font-size:24px; margin:0; letter-spacing:-0.3px; }
+  header .tag { color:var(--dim); font-size:14px; }
+  header a { color:var(--acc2); text-decoration:none; font-size:13px; margin-left:auto; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px 18px; margin-bottom:14px; }
+  .seg { display:flex; gap:6px; flex-wrap:wrap; }
+  .seg button { background:#0a0d11; border:1px solid var(--line); color:var(--dim); border-radius:8px; padding:8px 12px; font-size:13px; cursor:pointer; }
+  .seg button.on { background:var(--acc); color:#221243; border-color:var(--acc); font-weight:700; }
+  label { display:block; font-size:12px; color:var(--dim); margin:14px 0 6px; text-transform:uppercase; letter-spacing:0.6px; }
+  .chips { display:flex; gap:5px; flex-wrap:wrap; }
+  .chips button { min-width:44px; background:#0a0d11; border:1px solid var(--line); color:var(--ink); border-radius:8px; padding:8px 0; font-size:14px; cursor:pointer; }
+  .chips button.on { background:var(--acc); color:#221243; border-color:var(--acc); font-weight:700; }
+  canvas { width:100%; display:block; }
+  table { width:100%; border-collapse:collapse; font-size:13.5px; margin-top:6px; }
+  th, td { text-align:left; padding:7px 9px; border-bottom:1px solid var(--line); }
+  th { color:var(--dim); font-weight:600; font-size:11.5px; text-transform:uppercase; letter-spacing:0.5px; }
+  .bar { display:inline-block; height:8px; border-radius:4px; background:var(--bad); vertical-align:middle; margin-right:8px; }
+  .good { color:var(--acc); font-weight:600; }
+  .note { color:var(--dim); font-size:13px; margin-top:10px; }
+  .warn { color:var(--warn); }
+  h3 { margin:0 0 10px; font-size:16px; }
+  .grid { display:grid; grid-template-columns:280px 1fr; gap:16px; align-items:start; }
+  @media (max-width:820px){ .grid{ grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>WifiChan</h1>
+    <span class="tag">the band, drawn to scale</span>
+    <a href="index.html">&larr; about</a>
+  </header>
+  <div class="grid">
+    <div class="card">
+      <div class="seg">
+        <button id="b24" class="on" type="button">2.4 GHz</button>
+        <button id="b5" type="button">5 GHz</button>
+      </div>
+      <div id="ctl24">
+        <label>Region</label>
+        <div class="seg" id="region"></div>
+        <label>Your channel</label>
+        <div class="chips" id="ch24"></div>
+      </div>
+      <div id="ctl5" style="display:none">
+        <label>Primary channel</label>
+        <div class="chips" id="ch5"></div>
+        <label>Width</label>
+        <div class="seg" id="width5"></div>
+      </div>
+      <p class="note" id="sideNote"></p>
+    </div>
+    <div>
+      <div class="card">
+        <h3 id="mapTitle">Spectrum map</h3>
+        <canvas id="cv" width="900" height="320"></canvas>
+        <p class="note" id="mapNote"></p>
+      </div>
+      <div class="card">
+        <h3 id="detailTitle">Overlap detail</h3>
+        <div id="detail"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="engine.js"></script>
+<script>
+(function(){
+'use strict';
+var $=function(id){return document.getElementById(id);};
+var band='24', region='us', ch24=4, ch5=36, width5=80;
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');}
+function buildControls(){
+  var rg=$('region'); rg.innerHTML='';
+  Object.keys(WifiChan.REGIONS).forEach(function(k){
+    var b=document.createElement('button'); b.type='button'; b.textContent=k.toUpperCase();
+    if(k===region)b.className='on';
+    b.addEventListener('click',function(){region=k; var chs=WifiChan.REGIONS[k].channels; if(chs.indexOf(ch24)<0)ch24=chs[0]; buildControls(); render();});
+    rg.appendChild(b);
+  });
+  var c24=$('ch24'); c24.innerHTML='';
+  WifiChan.REGIONS[region].channels.forEach(function(ch){
+    var b=document.createElement('button'); b.type='button'; b.textContent=ch;
+    if(ch===ch24)b.className='on';
+    b.addEventListener('click',function(){ch24=ch; buildControls(); render();});
+    c24.appendChild(b);
+  });
+  var c5=$('ch5'); c5.innerHTML='';
+  WifiChan.BANDS5.forEach(function(bd){
+    bd.channels.forEach(function(ch){
+      var b=document.createElement('button'); b.type='button'; b.textContent=ch;
+      if(ch===ch5)b.className='on';
+      b.addEventListener('click',function(){ch5=ch; buildControls(); render();});
+      c5.appendChild(b);
+    });
+  });
+  var w5=$('width5'); w5.innerHTML='';
+  [20,40,80,160].forEach(function(w){
+    var b=document.createElement('button'); b.type='button'; b.textContent=w+' MHz';
+    if(w===width5)b.className='on';
+    b.addEventListener('click',function(){width5=w; buildControls(); render();});
+    w5.appendChild(b);
+  });
+}
+function bump(ctx,x0,x1,y,peak,color,alpha){
+  var cx=(x0+x1)/2, w=(x1-x0)/2;
+  ctx.beginPath();
+  ctx.moveTo(x0,y);
+  for(var x=x0;x<=x1;x+=2){
+    var d=(x-cx)/w;
+    ctx.lineTo(x,y-Math.exp(-2.2*d*d)*peak);
+  }
+  ctx.lineTo(x1,y);
+  ctx.closePath();
+  ctx.globalAlpha=alpha;
+  ctx.fillStyle=color;
+  ctx.fill();
+  ctx.globalAlpha=1;
+}
+function render(){
+  $('b24').classList.toggle('on',band==='24');
+  $('b5').classList.toggle('on',band==='5');
+  $('ctl24').style.display=band==='24'?'':'none';
+  $('ctl5').style.display=band==='5'?'':'none';
+  var cv=$('cv'), ctx=cv.getContext('2d');
+  var W=cv.width=cv.clientWidth*2, H=cv.height=560;
+  ctx.clearRect(0,0,W,H);
+  var pad=60, pw=W-pad-30, base=H-90, peak=H-220;
+  if(band==='24'){ render24(ctx,pad,pw,base,peak,W,H); } else { render5(ctx,pad,pw,base,peak,W,H); }
+}
+function fx(f,f0,f1,pad,pw){ return pad+pw*(f-f0)/(f1-f0); }
+function render24(ctx,pad,pw,base,peak,W,H){
+  var f0=2398, f1=2498;
+  var chs=WifiChan.REGIONS[region].channels;
+  ctx.strokeStyle='#262e3a'; ctx.fillStyle='#9aa6b2'; ctx.font='20px sans-serif';
+  for(var f=2400;f<=2500;f+=20){
+    var x=fx(f,f0,f1,pad,pw);
+    ctx.beginPath(); ctx.moveTo(x,base+8); ctx.lineTo(x,base+16); ctx.stroke();
+    ctx.fillText(String(f),x-18,base+42);
+  }
+  ctx.fillText('MHz',W-52,base+42);
+  chs.forEach(function(ch){
+    var s=WifiChan.span24(ch);
+    var x0=fx(s.lo,f0,f1,pad,pw), x1=fx(s.hi,f0,f1,pad,pw);
+    var mine=(ch===ch24);
+    var ov=mine?false:(WifiChan.overlapMHz(s.lo,s.hi,WifiChan.span24(ch24).lo,WifiChan.span24(ch24).hi)>0);
+    bump(ctx,x0,x1,base,peak,mine?'#a78bfa':(ov?'#f87171':'#3b4554'),mine?0.9:(ov?0.55:0.35));
+    ctx.fillStyle=mine?'#a78bfa':(ov?'#f87171':'#9aa6b2');
+    ctx.font=(mine?'bold ':'')+'20px sans-serif';
+    ctx.fillText(String(ch),(x0+x1)/2-10,base-peak-14);
+  });
+  $('mapTitle').textContent='2.4 GHz, '+WifiChan.REGIONS[region].label;
+  $('mapNote').textContent='Each channel is 22 MHz wide; channels sit 5 MHz apart. Red channels share spectrum with yours (channel '+ch24+').';
+  var ovs=WifiChan.overlaps24(ch24,region);
+  var html='<table><tr><th>Channel</th><th>Overlap with yours</th><th>Share of its width</th></tr>';
+  if(ovs.length===0){
+    html+='<tr><td colspan="3" class="good">No overlaps - channel '+ch24+' is clean against every channel in this region.</td></tr>';
+  } else {
+    ovs.forEach(function(o){
+      html+='<tr><td>'+o.channel+'</td><td><span class="bar" style="width:'+Math.round(o.mhz*4)+'px"></span>'+o.mhz+' MHz</td><td>'+o.pct+'%</td></tr>';
+    });
+  }
+  html+='</table>';
+  var sets=WifiChan.nonOverlappingSets24(region);
+  html+='<p class="note">Maximum non-overlapping sets here ('+sets.length+' found by exhaustive search): <span class="good">'+sets.map(function(s){return s.join(' / ');}).join(' &middot; ')+'</span></p>';
+  if(ch24===14) html+='<p class="note warn">Channel 14 is Japan-only and DSSS-only - most modern gear cannot use it at all.</p>';
+  else if(region==='us') html+='<p class="note">Picking any channel outside 1 / 6 / 11 guarantees you interfere with (and hear) two networks instead of one.</p>';
+  $('detailTitle').textContent='Channel '+ch24+' overlap detail';
+  $('detail').innerHTML=html;
+  $('sideNote').textContent='';
+}
+function render5(ctx,pad,pw,base,peak,W,H){
+  var f0=5150, f1=5900;
+  ctx.strokeStyle='#262e3a'; ctx.fillStyle='#9aa6b2'; ctx.font='20px sans-serif';
+  for(var f=5150;f<=5900;f+=50){
+    var x=fx(f,f0,f1,pad,pw);
+    ctx.beginPath(); ctx.moveTo(x,base+8); ctx.lineTo(x,base+16); ctx.stroke();
+    ctx.fillText(String(f),x-22,base+42);
+  }
+  ctx.fillText('MHz',W-52,base+42);
+  var me=WifiChan.span5(ch5,width5);
+  WifiChan.BANDS5.forEach(function(bd){
+    bd.channels.forEach(function(ch){
+      var c=WifiChan.center5(ch);
+      var x0=fx(c-10,f0,f1,pad,pw), x1=fx(c+10,f0,f1,pad,pw);
+      var inBlock=me&&me.block.indexOf(ch)>=0;
+      var mine=(ch===ch5);
+      bump(ctx,x0,x1,base,peak*0.75,mine?'#a78bfa':(inBlock?'#38bdf8':(bd.dfs?'#4b4136':'#3b4554')),mine?0.95:(inBlock?0.6:0.4));
+      ctx.fillStyle=mine?'#a78bfa':(inBlock?'#38bdf8':'#9aa6b2');
+      ctx.font=(mine?'bold ':'')+'18px sans-serif';
+      ctx.fillText(String(ch),(x0+x1)/2-14,base-peak*0.75-12);
+    });
+  });
+  if(me){
+    var bx0=fx(me.lo,f0,f1,pad,pw), bx1=fx(me.hi,f0,f1,pad,pw);
+    ctx.strokeStyle='#a78bfa'; ctx.lineWidth=3; ctx.setLineDash([8,6]);
+    ctx.strokeRect(bx0,base-peak-40,bx1-bx0,peak+52);
+    ctx.setLineDash([]); ctx.lineWidth=1;
+  }
+  var bd=WifiChan.bandOf5(ch5);
+  $('mapTitle').textContent='5 GHz ('+bd.name+(bd.dfs?', DFS':', no DFS')+')';
+  var html;
+  if(!me){
+    $('mapNote').textContent='No '+width5+' MHz block contains channel '+ch5+'.';
+    html='<p class="warn">Channel '+ch5+' cannot run at '+width5+' MHz. 160 MHz needs the 36-64 or 100-128 block; channel 165 is 20 MHz only.</p>';
+  } else {
+    $('mapNote').textContent=width5+' MHz on primary '+ch5+' = the fixed block '+me.block.join(', ')+' ('+me.lo+'-'+me.hi+' MHz). Blue channels share your airtime.';
+    var ovs=WifiChan.overlaps5(ch5,width5);
+    html='<table><tr><th>20 MHz channel inside your block</th><th>Band</th><th>DFS</th></tr>';
+    ovs.forEach(function(o){
+      html+='<tr><td>'+o.channel+'</td><td>'+o.band+'</td><td>'+(o.dfs?'<span class="warn">yes - radar check</span>':'no')+'</td></tr>';
+    });
+    if(ovs.length===0) html+='<tr><td colspan="3" class="good">Just channel '+ch5+' itself at 20 MHz.</td></tr>';
+    html+='</table>';
+    html+='<p class="note">'+(width5===20?'At 20 MHz you share airtime with nobody but networks on your own channel - the slowest, politest choice.':'Every network anywhere in the '+me.block.length+' slots of your block counts as a co-channel neighbor: wider is faster when the band is empty, and a liability when it is not.')+'</p>';
+    if(bd.dfs) html+='<p class="note warn">'+bd.name+' is a DFS band: your AP must listen for radar before using it and must move if radar appears - that is the 60-second pause at boot and the occasional unexplained channel hop.</p>';
+  }
+  $('detailTitle').textContent='Channel '+ch5+' at '+width5+' MHz';
+  $('detail').innerHTML=html;
+  $('sideNote').textContent='';
+}
+$('b24').addEventListener('click',function(){band='24';buildControls();render();});
+$('b5').addEventListener('click',function(){band='5';buildControls();render();});
+window.addEventListener('resize',render);
+buildControls();
+render();
+})();
+</script>
+</body>
+</html>
